@@ -20,7 +20,7 @@ var (
 
 func main() {
 	// recovery local data to map
-	err := recovery()
+	recovery()
 
 	actions.User.Login(settings.Setting.Username, settings.Setting.Password)
 	// get question status
@@ -33,85 +33,13 @@ func main() {
 
 	for _, question := range questions {
 		// find questions ac
-		q, ok := questionIDMap[question.ID]
-		if question.Status == "ac" {
-			if ok {
-				if q.Status == "ac" {
-					continue
-				} else {
-					q.Status = "ac"
-					question = q
-				}
-			} else {
-				questionIDMap[question.ID] = question
-				questionSlugMap[question.TitleSlug] = question
-			}
-		} else {
+		question = checkQuestion(question)
+		if question == nil {
 			continue
 		}
-
 		log.Printf("处理题目: %d, %s", question.ID, question.Title)
-		if question.Content == "" {
-			q, err := actions.User.GetQuestionDetail(question.TitleSlug)
-			if err == nil {
-				question.Content = q.Content
-				if q.TranslatedContent != "" {
-					question.TranslatedContent = q.TranslatedContent
-				}
-				if q.TranslatedTitle != "" {
-					question.TranslatedTitle = q.TranslatedTitle
-				}
-				if question.Tags == nil {
-					question.Tags = q.Tags
-				}
-			}
-		}
 
-		times := 5
-		lastKey := ""
-		hasNext := true
-		for {
-			// get submit history
-			if !hasNext {
-				break
-			}
-			log.Printf("获取 %d, %s 提交状态 ", question.ID, question.Title)
-			pageSubmits, newLastKey, err := actions.User.GetSubmitHistory(1, lastKey, question.TitleSlug)
-			if err != nil {
-				times -= 1
-				if times < 0 {
-					break
-				}
-				continue
-			}
-			if len(pageSubmits) < 20 {
-				hasNext = false
-			}
-			lastKey = newLastKey
-			log.Printf("答案数量 %d", len(pageSubmits))
-			for _, submit := range pageSubmits {
-				if submit.StatusDisplay != "Accepted" {
-					continue
-				}
-				if _, ok := submitIDMap[submit.ID]; ok {
-					continue
-				}
-				log.Printf("下载 %d, %s submit %d 代码 ", question.ID, question.Title, submit.ID)
-				if question.Submits == nil {
-					question.Submits = make(map[int64]*models.Submit)
-				}
-				submitIDMap[submit.ID] = submit
-				question.Submits[submit.ID] = submit
-				// get code
-				code, err := actions.User.GetSubmitDetail(submit.ID)
-				if err != nil {
-
-				}
-				submit.Code = code
-				time.Sleep(1 * time.Second)
-			}
-			time.Sleep(2 * time.Second)
-		}
+		fetchQuestionSubmitCode(question)
 	}
 	save()
 	// gene code to file
@@ -120,48 +48,141 @@ func main() {
 
 }
 
+func fetchQuestionSubmitCode(question *models.Question) {
+	times := 5
+	lastKey := ""
+	hasNext := true
+	for {
+		// get submit history
+		if !hasNext {
+			break
+		}
+		log.Printf("获取 %d, %s 提交状态 ", question.ID, question.Title)
+		pageSubmits, newLastKey, err := actions.User.GetSubmitHistory(1, lastKey, question.TitleSlug)
+		if err != nil {
+			times -= 1
+			if times < 0 {
+				break
+			}
+			continue
+		}
+		if len(pageSubmits) < 20 {
+			hasNext = false
+		}
+		lastKey = newLastKey
+		log.Printf("答案数量 %d", len(pageSubmits))
+		for _, submit := range pageSubmits {
+			if submit.StatusDisplay != "Accepted" {
+				continue
+			}
+			if _, ok := submitIDMap[submit.ID]; ok {
+				continue
+			}
+			log.Printf("下载 %d, %s submit %d 代码 ", question.ID, question.Title, submit.ID)
+			if question.Submits == nil {
+				question.Submits = make(map[int64]*models.Submit)
+			}
+			submitIDMap[submit.ID] = submit
+			question.Submits[submit.ID] = submit
+			// get code
+			code, err := actions.User.GetSubmitDetail(submit.ID)
+			if err != nil {
+
+			}
+			submit.Code = code
+			time.Sleep(1 * time.Second)
+		}
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func checkQuestion(question *models.Question) *models.Question {
+	flag := true
+	q, ok := questionIDMap[question.ID]
+	if question.Status == "ac" {
+		if ok {
+			if q.Status == "ac" {
+				flag = false
+			} else {
+				q.Status = "ac"
+			}
+		} else {
+			questionIDMap[question.ID] = question
+			questionSlugMap[question.TitleSlug] = question
+			q = question
+		}
+	} else {
+		return nil
+	}
+	if settings.Setting.Enter == "cn" {
+		q.TranslatedTitle = question.TranslatedTitle
+		if q.TranslatedContent == "" {
+			fillQuestionContent(q)
+		}
+	} else if q.Content == "" {
+		fillQuestionContent(q)
+	}
+	if !flag {
+		return nil
+	}
+	return q
+}
+
+func fillQuestionContent(question *models.Question) {
+	q, err := actions.User.GetQuestionDetail(question.TitleSlug)
+	if err == nil {
+		question.Content = q.Content
+		if settings.Setting.Enter == "cn" && question.TranslatedContent == "" {
+			question.TranslatedContent = q.TranslatedContent
+			question.TranslatedTitle = q.TranslatedTitle
+		}
+		if question.Tags == nil {
+			question.Tags = q.Tags
+		}
+	}
+}
+
 func save() {
 	data := make(map[string]interface{})
 	data["questions"] = make([]*models.Question, 0)
-	data["submits"] = make([]*models.Submit, 0)
 	for _, q := range questionIDMap {
 		data["questions"] = append(data["questions"].([]*models.Question), q)
-	}
-	for _, s := range submitIDMap {
-		data["submits"] = append(data["submits"].([]*models.Submit), s)
 	}
 	// save data to file
 	jsonData, err := json.Marshal(data)
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = ioutil.WriteFile("leetcode-data.json", jsonData, 0644)
+	err = ioutil.WriteFile(settings.Setting.SaveFile, jsonData, 0644)
 	if err != nil {
 		log.Fatalln("save error")
 	}
 }
 
-func recovery() error {
-	file, err := os.Open("leetcode-data.json")
+func recovery() {
+	log.Println("开始数据恢复")
+	file, err := os.Open(settings.Setting.SaveFile)
 	if err != nil {
 		log.Printf("%v", err)
 		log.Println("跳过恢复")
-		return err
+		return
 	}
 	defer file.Close()
 	recoveryData, _ := ioutil.ReadAll(file)
 	for _, q := range gjson.GetBytes(recoveryData, "questions").Array() {
 		var question models.Question
 		if err := json.Unmarshal([]byte(q.String()), &question); err != nil {
-			questionIDMap[question.ID] = &question
-			questionSlugMap[question.TitleSlug] = &question
+			continue
+		}
+		questionIDMap[question.ID] = &question
+		questionSlugMap[question.TitleSlug] = &question
+		if question.Submits != nil {
+			for _, submit := range question.Submits {
+				submitIDMap[submit.ID] = submit
+			}
+		} else {
+			question.Submits = make(map[int64]*models.Submit)
 		}
 	}
-	for _, q := range gjson.GetBytes(recoveryData, "submits").Array() {
-		var submit models.Submit
-		if err := json.Unmarshal([]byte(q.String()), &submit); err != nil {
-			submitIDMap[submit.ID] = &submit
-		}
-	}
-	return err
+	return
 }

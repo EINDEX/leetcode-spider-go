@@ -11,6 +11,7 @@ type setting struct {
 	Enter    string
 	Username string
 	Password string
+	SaveFile string
 }
 
 func init() {
@@ -18,5 +19,4 @@ func init() {
 		fmt.Errorf("%v", err)
 		return
 	}
-
 }

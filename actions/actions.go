@@ -122,7 +122,6 @@ func (u *user) Login(username, password string) {
 	if resp.StatusCode == http.StatusOK {
 		for _, cookie := range resp.Cookies() {
 			if cookie.Name == "LEETCODE_SESSION" {
-				println(cookie.Value)
 				log.Printf("%s Login Success\n", username)
 				u.status = 1
 				return
