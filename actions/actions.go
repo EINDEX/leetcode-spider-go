@@ -109,10 +109,6 @@ func (u *user) Login(username, password string) {
 	request.Header.Add("referer", baseURL+"accounts/login/?next=%2Fproblems%2Fall%2F")
 	request.Header.Add("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36")
 	request.Header.Add("content-type", header)
-	uri, _ := url.Parse(baseURL)
-	for _, cookie := range u.client.Jar.Cookies(uri) {
-		request.AddCookie(cookie)
-	}
 
 	resp, err := u.client.Do(request)
 	if err != nil {
@@ -239,12 +235,16 @@ func (u *user) GetSubmitDetail(submitID int64) (data string, err error) {
 	if err != nil {
 		return "", err
 	}
-	re := regexp.MustCompile("submissionCode:\\s('[^']*')")
+	re := regexp.MustCompile("submissionCode:\\s'([^']*)'")
 	matchs := re.FindStringSubmatch(string(body))
 	if len(matchs) < 1 {
 		return "", err
 	}
-	return matchs[1], nil
+	var code string
+	if err := json.Unmarshal([]byte("\""+matchs[1]+"\""), &code); err != nil {
+		log.Printf("%v", err)
+	}
+	return code, nil
 
 	//todo runtimeDistributionFormatted what best leetcode
 	// re := regexp.MustCompile("runtimeDistributionFormatted:\\s('[^']+')")

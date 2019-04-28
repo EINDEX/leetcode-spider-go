@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/tidwall/gjson"
 	"io/ioutil"
 	"leetcode-tools/actions"
@@ -9,6 +10,8 @@ import (
 	"leetcode-tools/settings"
 	"log"
 	"os"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -43,9 +46,101 @@ func main() {
 	}
 	save()
 	// gene code to file
+	geneFiles()
 
 	// gene commit each file
 
+}
+
+func geneFiles() {
+	questionLang := make(map[int64][][]string)
+	for id, question := range questionIDMap {
+		path := fmt.Sprintf("/%d-%s/", question.FrontendID, question.TitleSlug)
+		if err := os.MkdirAll(settings.Setting.Out+path, os.ModePerm); err != nil {
+			panic(err)
+		}
+		langSubmit := make(map[string]*models.Submit)
+		for _, submit := range question.Submits {
+			s, ok := langSubmit[submit.Lang]
+			if (ok && s.Runtime > submit.Runtime) || !ok {
+				langSubmit[submit.Lang] = submit
+			}
+		}
+
+		questionLangInfo := make([][]string, 0, len(langSubmit))
+		listLang := make([]string, 0, len(langSubmit))
+		for _, s := range langSubmit {
+			listLang = append(listLang, s.Lang)
+			var suffix string
+			switch s.Lang {
+			case "python3", "python":
+				suffix = "py"
+			case "go":
+				suffix = "go"
+			case "mysql":
+				suffix = "sql"
+			case "c++":
+				suffix = "cpp"
+			case "c":
+				suffix = "c"
+			case "java":
+				suffix = "java"
+			case "JavaScript":
+				suffix = "js"
+			}
+			codePath := path + question.TitleSlug + "." + s.Lang + "." + suffix
+			questionLangInfo = append(questionLangInfo, []string{s.Lang, codePath})
+			if _, err := os.Stat(settings.Setting.Out + codePath); !os.IsNotExist(err) {
+				continue
+			}
+			if err := ioutil.WriteFile(settings.Setting.Out+codePath, []byte(s.Code), 0644); err != nil {
+				log.Printf("write file error: %v", err)
+			}
+		}
+		questionLang[id] = questionLangInfo
+		sort.Strings(listLang)
+		readmePath := path + "README.md"
+		readme := fmt.Sprintf("# %s\n\n## Question\n%s \n## Solution\n", question.Title, question.Content)
+		for _, lang := range listLang {
+			readme += fmt.Sprintf("### %s\n ```%s\n%s\n``` \n", lang, lang, langSubmit[lang].Code)
+		}
+		readme += "## Author \nEINDEX"
+		if err := ioutil.WriteFile(settings.Setting.Out+readmePath, []byte(readme), 0644); err != nil {
+			log.Printf("write file error: %v", err)
+		}
+		readmeCNPath := path + "README-ZH.md"
+		readmeCN := fmt.Sprintf("# %s\n\n## 问题\n%s \n## 解法\n", question.TranslatedTitle, question.TranslatedContent)
+		for _, lang := range listLang {
+			readmeCN += fmt.Sprintf("### %s\n ```%s\n%s\n``` \n", lang, lang, langSubmit[lang].Code)
+		}
+		readmeCN += "## 作者 \nEINDEX"
+		if err := ioutil.WriteFile(settings.Setting.Out+readmeCNPath, []byte(readmeCN), 0644); err != nil {
+			log.Printf("write file error: %v", err)
+		}
+
+		allReadme := "# LeetCode"
+		allReadme += `
+| # | Problems | Solutions |
+|:--:|:-----:|:---------:|
+`
+		for i := 0; i < len(questionIDMap); i++ {
+			question, ok := questionIDMap[int64(i)]
+			if !ok {
+				continue
+			}
+			langs := questionLang[question.ID]
+
+			langString := ""
+			for _, lang := range langs {
+				langString += fmt.Sprintf("[%s](.%s) ", lang[0], lang[1])
+			}
+			questionURL := fmt.Sprintf("[%s](https://leetcode.com/problems/%s)", question.TitleSlug, question.TitleSlug)
+			allReadme += fmt.Sprintf("|%d|%s|%s|\n", question.FrontendID, questionURL, langString)
+		}
+		if err := ioutil.WriteFile(settings.Setting.Out+"/"+"README.md", []byte(allReadme), 0644); err != nil {
+			log.Printf("write file error: %v", err)
+		}
+	}
 }
 
 func fetchQuestionSubmitCode(question *models.Question) {
@@ -179,6 +274,16 @@ func recovery() {
 		if question.Submits != nil {
 			for _, submit := range question.Submits {
 				submitIDMap[submit.ID] = submit
+				if submit.Code[0] == '\'' {
+					submit.Code = "\"" + strings.TrimFunc(submit.Code, func(r rune) bool {
+						return r == '\''
+					}) + "\""
+					var code string
+					if err := json.Unmarshal([]byte(submit.Code), &code); err != nil {
+						log.Printf("%v", err)
+					}
+					submit.Code = code
+				}
 			}
 		} else {
 			question.Submits = make(map[int64]*models.Submit)

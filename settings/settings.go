@@ -12,11 +12,15 @@ type setting struct {
 	Username string
 	Password string
 	SaveFile string
+	Out      string
 }
 
 func init() {
 	if _, err := toml.DecodeFile("settings.toml", &Setting); err != nil {
 		fmt.Errorf("%v", err)
 		return
+	}
+	if Setting.Out[len(Setting.Out)-1] == '/' {
+		Setting.Out = Setting.Out[:len(Setting.Out)-1]
 	}
 }
