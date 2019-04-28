@@ -1,4 +1,4 @@
-package main
+package models
 
 import "fmt"
 
@@ -15,7 +15,7 @@ type Question struct {
 	Status string
 
 	Tags    []*Tag
-	Submits []*Submit
+	Submits map[int64]*Submit
 }
 
 type Tag struct {
