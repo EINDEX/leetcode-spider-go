@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"leetcode-tools/models"
+	"leetcode-tools/settings"
 	"leetcode-tools/utils"
 	"log"
 	"net/http"
@@ -18,8 +19,20 @@ import (
 )
 
 var (
-	proxyURL, _  = url.Parse("http://127.0.0.1:8080")
-	cookieJar, _ = cookiejar.New(nil)
+	baseURL  string
+	graphQL  string
+	loginURL string
+	User     *user
+)
+
+type user struct {
+	status int
+	client *http.Client
+}
+
+func init() {
+	proxyURL, _ := url.Parse("http://127.0.0.1:8080")
+	cookieJar, _ := cookiejar.New(nil)
 
 	User = &user{
 		status: 0,
@@ -33,18 +46,13 @@ var (
 			Jar: cookieJar,
 		},
 	}
-
-	baseURL  = "https://leetcode.com/"
-	graphQL  = baseURL + "graphql/"
+	if settings.Setting.Enter == "cn" {
+		baseURL = "https://leetcode-cn.com/"
+	} else {
+		baseURL = "https://leetcode.com/"
+	}
+	graphQL = baseURL + "graphql/"
 	loginURL = baseURL + "accounts/login/"
-)
-
-type user struct {
-	status int
-	client *http.Client
-}
-
-func init() {
 	resp, _ := User.client.Get(loginURL)
 	defer resp.Body.Close()
 }
