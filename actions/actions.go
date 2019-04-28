@@ -67,7 +67,7 @@ func (u *user) geneGraphQLRequest(query io.Reader) (request *http.Request) {
 
 	request.Header.Add("content-type", "application/json")
 	request.Header.Add("x-csrftoken", u.getCsrfToken())
-	request.Header.Add("referer", "https://leetcode.com")
+	request.Header.Add("referer", baseURL)
 	request.Header.Add("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36")
 
 	uri, _ := url.Parse(baseURL)
@@ -106,7 +106,7 @@ func (u *user) Login(username, password string) {
 	}
 	request.Header.Add("x-csrftoken", u.getCsrfToken())
 	request.Header.Add("x-requested-with", "XMLHttpRequest")
-	request.Header.Add("referer", "https://leetcode.com/accounts/login/?next=%2Fproblems%2Fall%2F")
+	request.Header.Add("referer", baseURL+"accounts/login/?next=%2Fproblems%2Fall%2F")
 	request.Header.Add("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36")
 	request.Header.Add("content-type", header)
 	uri, _ := url.Parse(baseURL)
