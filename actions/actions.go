@@ -1,4 +1,4 @@
-package main
+package actions
 
 import (
 	"crypto/tls"
@@ -7,10 +7,13 @@ import (
 	"github.com/tidwall/gjson"
 	"io"
 	"io/ioutil"
+	"leetcode-tools/models"
+	"leetcode-tools/utils"
 	"log"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"regexp"
 	"strings"
 )
 
@@ -83,7 +86,7 @@ func (u *user) Login(username, password string) {
 		"password":            strings.NewReader(password),
 		"next":                strings.NewReader("/problems"),
 	}
-	buffer, header, err := GetMultipartForm(values)
+	buffer, header, err := utils.GetMultipartForm(values)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -122,7 +125,7 @@ func (u *user) Login(username, password string) {
 	return
 }
 
-func (u *user) GetAllQuestionStatus() (data []*Question, err error) {
+func (u *user) GetAllQuestionStatus() (data []*models.Question, err error) {
 	query := "{\"query\":\"query allQuestions {\\n  allQuestions {\\n    ...questionSummaryFields\\n    __typename\\n  }\\n}\\n\\nfragment questionSummaryFields on QuestionNode {\\n  title\\n  titleSlug\\n  translatedTitle\\n  questionId\\n  questionFrontendId\\n  status\\n  difficulty\\n  isPaidOnly\\n  __typename\\n}\\n\",\"variables\":{},\"operationName\":\"allQuestions\"}"
 	request := u.geneGraphQLRequest(strings.NewReader(query))
 	resp, err := u.client.Do(request)
@@ -144,14 +147,23 @@ func (u *user) GetAllQuestionStatus() (data []*Question, err error) {
 	return
 }
 
-func (u *user) GetSubmitHistory(page int, lastKey string) (data []*Submit, nextLastKey string, err error) {
+func (u *user) GetSubmitHistory(page int, lastKey string, slug string) (data []*models.Submit, nextLastKey string, err error) {
+	var query string
+
 	pageSize := 20
 	offset := (page - 1) * pageSize
 	if lastKey == "" {
 		lastKey = "null"
+	} else {
+		lastKey = "\n" + lastKey + "\n"
 	}
-	query := "{\"query\":\"query Submissions($offset: Int!, $limit: Int!, $lastKey: String) {\\n  submissionList(offset: $offset, limit: $limit, lastKey: $lastKey) {\\n    lastKey\\n    hasNext\\n    submissions {\\n      id\\n      statusDisplay\\n      lang\\n      runtime\\n      timestamp\\n      url\\n      isPending\\n      memory\\n      __typename\\n    }\\n    __typename\\n  }\\n}\\n\",\"variables\":{\"offset\":%d,\"limit\":%d,\"lastKey\":%s},\"operationName\":\"Submissions\"}"
-	query = fmt.Sprintf(query, pageSize, offset, lastKey)
+	if slug == "" {
+		query = "{\"query\":\"query Submissions($offset: Int!, $limit: Int!, $lastKey: String) {\\n  submissionList(offset: $offset, limit: $limit, lastKey: $lastKey) {\\n    lastKey\\n    hasNext\\n    submissions {\\n      id\\n      statusDisplay\\n      lang\\n      runtime\\n      timestamp\\n      url\\n      isPending\\n      memory\\n      __typename\\n    }\\n    __typename\\n  }\\n}\\n\",\"variables\":{\"offset\":%d,\"limit\":%d,\"lastKey\":%s},\"operationName\":\"Submissions\"}"
+		query = fmt.Sprintf(query, offset, pageSize, lastKey)
+	} else {
+		query = "{\"query\":\"query Submissions($offset: Int!, $limit: Int!, $lastKey: String, $questionSlug: String!) {\\n  submissionList(offset: $offset, limit: $limit, lastKey: $lastKey, questionSlug: $questionSlug) {\\n    lastKey\\n    hasNext\\n    \\n    submissions {\\n      id\\n      statusDisplay\\n      lang\\n      runtime\\n      timestamp\\n      url\\n      title\\n\\n      isPending\\n      memory\\n      __typename\\n      \\n    }\\n    __typename\\n  }\\n}\\n\",\"variables\":{\"offset\":%d,\"limit\":%d,\"lastKey\":%s,\"questionSlug\":\"%s\"},\"operationName\":\"Submissions\"}"
+		query = fmt.Sprintf(query, offset, pageSize, lastKey, slug)
+	}
 	req := u.geneGraphQLRequest(strings.NewReader(query))
 	resp, err := u.client.Do(req)
 	if err != nil {
@@ -172,7 +184,7 @@ func (u *user) GetSubmitHistory(page int, lastKey string) (data []*Submit, nextL
 	return data, nextLastKey, nil
 }
 
-func (u *user) GetQuestionDetail(questionSlug string) (question *Question, err error) {
+func (u *user) GetQuestionDetail(questionSlug string) (question *models.Question, err error) {
 	query := "{\"query\":\"query questionData($titleSlug: String!) {\\n  question(titleSlug: $titleSlug) {\\n    questionId\\n    questionFrontendId\\n    boundTopicId\\n    title\\n    titleSlug\\n    content\\n    translatedTitle\\n    translatedContent\\n    isPaidOnly\\n    difficulty\\n    likes\\n    dislikes\\n    isLiked\\n    similarQuestions\\n    contributors {\\n      username\\n      profileUrl\\n      avatarUrl\\n      __typename\\n    }\\n    langToValidPlayground\\n    topicTags {\\n      name\\n      slug\\n      translatedName\\n      __typename\\n    }\\n    companyTagStats\\n    codeSnippets {\\n      lang\\n      langSlug\\n      code\\n      __typename\\n    }\\n    stats\\n    hints\\n    solution {\\n      id\\n      canSeeDetail\\n      __typename\\n    }\\n    status\\n    sampleTestCase\\n    metaData\\n    judgerAvailable\\n    judgeType\\n    mysqlSchemas\\n    enableRunCode\\n    enableTestMode\\n    envInfo\\n    libraryUrl\\n    __typename\\n    submitUrl\\n  }\\n}\\n\",\"variables\":{\"titleSlug\":\"%s\"},\"operationName\":\"questionData\"}"
 	query = fmt.Sprintf(query, questionSlug)
 	req := u.geneGraphQLRequest(strings.NewReader(query))
@@ -187,9 +199,9 @@ func (u *user) GetQuestionDetail(questionSlug string) (question *Question, err e
 	if err != nil {
 		return nil, err
 	}
-	question = &Question{
-		Tags: make([]*Tag, 0),
-		Submits: make([]*Submit, 0),
+	question = &models.Question{
+		Tags:    make([]*models.Tag, 0),
+		Submits: make(map[int64]*models.Submit),
 	}
 	data := gjson.GetBytes(body, "data.question").String()
 	if err := json.Unmarshal([]byte(data), question); err != nil {
@@ -199,7 +211,7 @@ func (u *user) GetQuestionDetail(questionSlug string) (question *Question, err e
 }
 
 func (u *user) GetSubmitDetail(submitID int64) (data string, err error) {
-	submitURL := baseURL + "submissions/detail/%d"
+	submitURL := baseURL + fmt.Sprintf("submissions/detail/%d/", submitID)
 	req, err := http.NewRequest("GET", submitURL, nil)
 	if err != nil {
 		return
@@ -209,7 +221,7 @@ func (u *user) GetSubmitDetail(submitID int64) (data string, err error) {
 	req.Header.Add("referer", "https://leetcode.com")
 	req.Header.Add("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36")
 
-	resp, err := u.client.Get(fmt.Sprintf(submitURL, submitID))
+	resp, err := u.client.Do(req)
 	if err != nil {
 		log.Fatalf("Get Submit Detail Failed %v\n", err)
 		return "", err
@@ -220,19 +232,16 @@ func (u *user) GetSubmitDetail(submitID int64) (data string, err error) {
 	if err != nil {
 		return "", err
 	}
-	// Todo get code
-	//const opts = plugin.makeOpts(config.sys.urls.submission.replace('$id', submission.id));
-	//
-	//request(opts, function(e, resp, body) {
-	//	e = plugin.checkError(e, resp, 200);
-	//	if (e) return cb(e);
-	//
-	//	let re = body.match(/submissionCode:\s('[^']*')/);
-	//	if (re) submission.code = eval(re[1]);
-	//
-	//	re = body.match(/distribution_formatted:\s('[^']+')/);
-	//	if (re) submission.distributionChart = JSON.parse(eval(re[1]));
-	//	return cb(null, submission);
-	//});
-	return string(body), nil
+	re := regexp.MustCompile("submissionCode:\\s('[^']*')")
+	matchs := re.FindStringSubmatch(string(body))
+	if len(matchs) < 1 {
+		return "", err
+	}
+	return matchs[1], nil
+
+	//todo runtimeDistributionFormatted what best leetcode
+	// re := regexp.MustCompile("runtimeDistributionFormatted:\\s('[^']+')")
+
+	//todo memoryDistributionFormatted waat best leetcode
+	// re := regexp.MustCompile("memoryDistributionFormatted:\\s('[^']+')")
 }
