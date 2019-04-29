@@ -2,9 +2,12 @@ package utils
 
 import (
 	"bytes"
+	"fmt"
 	"io"
+	"leetcode-tools/settings"
 	"mime/multipart"
 	"os"
+	"os/exec"
 )
 
 func GetMultipartForm(values map[string]io.Reader) (buffer bytes.Buffer, header string, err error) {
@@ -32,5 +35,37 @@ func GetMultipartForm(values map[string]io.Reader) (buffer bytes.Buffer, header 
 	}
 	header = w.FormDataContentType()
 	w.Close()
+	return
+}
+
+func GetLangSuffix(lang string) string {
+	var suffix string
+	switch lang {
+	case "python3", "python":
+		suffix = "py"
+	case "go":
+		suffix = "go"
+	case "mysql":
+		suffix = "sql"
+	case "c++":
+		suffix = "cpp"
+	case "c":
+		suffix = "c"
+	case "java":
+		suffix = "java"
+	case "JavaScript":
+		suffix = "js"
+	}
+	return suffix
+}
+
+func ExecCommend(name string, args ...string) (err error) {
+	cmd := exec.Command(name, args...)
+	cmd.Dir = settings.Setting.Out
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Println(err)
+	}
 	return
 }

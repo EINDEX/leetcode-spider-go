@@ -8,12 +8,11 @@ import (
 	"leetcode-tools/actions"
 	"leetcode-tools/models"
 	"leetcode-tools/settings"
+	"leetcode-tools/utils"
 	"log"
 	"os"
-	"os/exec"
 	"sort"
 	"strings"
-	"text/template"
 	"time"
 )
 
@@ -70,7 +69,7 @@ func geneFiles() {
 		listLang := make([]string, 0, len(langSubmit))
 		for _, s := range langSubmit {
 			listLang = append(listLang, s.Lang)
-			codePath := path + question.TitleSlug + "." + s.Lang + "." + getLangSuffix(s.Lang)
+			codePath := path + question.TitleSlug + "." + s.Lang + "." + utils.GetLangSuffix(s.Lang)
 			questionLangInfo = append(questionLangInfo, []string{s.Lang, codePath})
 			if _, err := os.Stat(settings.Setting.Out + codePath); !os.IsNotExist(err) {
 				continue
@@ -78,30 +77,19 @@ func geneFiles() {
 			if err := ioutil.WriteFile(settings.Setting.Out+codePath, []byte(s.Code), 0644); err != nil {
 				log.Printf("write file error: %v", err)
 			}
-			cmd := exec.Command("git", "add", settings.Setting.Out+codePath)
-			cmd.Dir = settings.Setting.Out
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
-				fmt.Println(err)
+			if err := utils.ExecCommend("git", "add", settings.Setting.Out+codePath); err != nil {
+				log.Fatalln(err)
 			}
-			cmd2 := exec.Command("git", "commit", "--date", time.Unix(s.Timestamp, 0).Format("2006-01-02 15:04:05"), "-m", fmt.Sprintf("%s %s solution", question.TitleSlug, s.Lang))
-			cmd2.Dir = settings.Setting.Out
-			cmd2.Stdout = os.Stdout
-			cmd2.Stderr = os.Stderr
-			if err := cmd2.Run(); err != nil {
-				fmt.Println(err)
+			if err := utils.ExecCommend("git", "commit", "--date", time.Unix(s.Timestamp, 0).Format("2006-01-02 15:04:05"), "-m", fmt.Sprintf("%s %s solution", question.TitleSlug, s.Lang)); err != nil {
+				log.Fatalln(err)
 			}
 		}
 		questionLang[id] = questionLangInfo
 		sort.Strings(listLang)
 
-		readmePath := settings.Setting.Out + path + "README.md"
-		questionRender(readmePath, question, langSubmit, listLang)
-
+		utils.QuestionRender(settings.Setting.Out+path+"README.md", question, langSubmit, listLang)
 		if settings.Setting.Enter == "cn" {
-			readmeCNPath := settings.Setting.Out + path + "README-ZH.md"
-			questionRender(readmeCNPath, question, langSubmit, listLang)
+			utils.QuestionRender(settings.Setting.Out+path+"README-ZH.md", question, langSubmit, listLang)
 		}
 	}
 	keys := make([]int, len(questionIDMap))
@@ -121,76 +109,9 @@ func geneFiles() {
 		}
 	}
 
-	render(solutions, "README.md", "global")
+	utils.Render(solutions, "README.md", "global")
 	if settings.Setting.Enter == "cn" {
-		render(solutions, "README-ZN.md", "cn")
-	}
-}
-
-func getLangSuffix(lang string) string {
-	var suffix string
-	switch lang {
-	case "python3", "python":
-		suffix = "py"
-	case "go":
-		suffix = "go"
-	case "mysql":
-		suffix = "sql"
-	case "c++":
-		suffix = "cpp"
-	case "c":
-		suffix = "c"
-	case "java":
-		suffix = "java"
-	case "JavaScript":
-		suffix = "js"
-	}
-	return suffix
-}
-
-func questionRender(readmePath string, question *models.Question, langSubmit map[string]*models.Submit, listLang []string) {
-	tmpl, err := template.ParseFiles("template/question_readme.tmpl")
-	if err != nil {
-		log.Fatal(err)
-	}
-	f, err := os.Create(readmePath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-	err = tmpl.Execute(f, &struct {
-		Question   *models.Question
-		LangSubmit map[string]*models.Submit
-		ListLang   []string
-		Mode       string
-	}{
-		Question:   question,
-		LangSubmit: langSubmit,
-		ListLang:   listLang,
-	})
-}
-
-func render(solutions []*map[string]interface{}, filename, mode string) {
-	temp, err := template.ParseFiles("template/readme.tmpl")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	f, err := os.Create(settings.Setting.Out + "/" + filename)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer f.Close()
-	err = temp.Execute(f, &struct {
-		Time     string
-		Solution []*map[string]interface{}
-		Mode     string
-	}{
-		Time:     time.Now().Format("2006-01-02"),
-		Solution: solutions,
-		Mode:     mode,
-	})
-	if err != nil {
-		log.Fatal(err)
+		utils.Render(solutions, "README-ZN.md", "cn")
 	}
 }
 
