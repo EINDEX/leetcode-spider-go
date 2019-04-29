@@ -235,7 +235,7 @@ func fetchQuestionSubmitCode(question *models.Question) {
 			if err != nil {
 
 			}
-			submit.Code = code
+			submit.Code = strings.ReplaceAll(code, "\r\n", "\n")
 			time.Sleep(1 * time.Second)
 		}
 		time.Sleep(2 * time.Second)
