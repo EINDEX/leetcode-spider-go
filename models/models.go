@@ -3,11 +3,12 @@ package models
 import "fmt"
 
 type Question struct {
-	ID         int64 `json:"questionId,string"`
-	FrontendID int64 `json:"questionFrontendId,string"`
+	ID         int `json:"questionId,string"`
+	FrontendID int `json:"questionFrontendId,string"`
 	Title      string
 	TitleSlug  string
 	Content    string
+	Difficulty string
 
 	TranslatedTitle   string
 	TranslatedContent string
@@ -32,6 +33,7 @@ type Submit struct {
 	Memory        string
 	URL           string
 	Code          string
+	Timestamp     int64 `json:",string"`
 }
 
 func (question *Question) String() string {

@@ -1,0 +1,16 @@
+# {{ .Question.Title }}
+
+## Difficulty
+{{ .Question.Difficulty }}
+
+## Question
+{{ .Question.Content }}
+
+## Solution{{ $s:=.LangSubmit }}{{ range $c:=.ListLang }}{{ with index $s $c}}
+### {{ .Lang }}
+```{{ .Lang }}
+{{ .Code }}
+```{{ end }}{{ end }}
+
+## Author
+EINDEX

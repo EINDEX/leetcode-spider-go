@@ -31,14 +31,12 @@ type user struct {
 }
 
 func init() {
-	proxyURL, _ := url.Parse("http://127.0.0.1:8080")
 	cookieJar, _ := cookiejar.New(nil)
 
 	User = &user{
 		status: 0,
 		client: &http.Client{
 			Transport: &http.Transport{
-				Proxy: http.ProxyURL(proxyURL),
 				TLSClientConfig: &tls.Config{
 					InsecureSkipVerify: true,
 				},

@@ -10,13 +10,15 @@ import (
 	"leetcode-tools/settings"
 	"log"
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
+	"text/template"
 	"time"
 )
 
 var (
-	questionIDMap   = make(map[int64]*models.Question)
+	questionIDMap   = make(map[int]*models.Question)
 	questionSlugMap = make(map[string]*models.Question)
 	submitIDMap     = make(map[int64]*models.Submit)
 )
@@ -47,13 +49,10 @@ func main() {
 	save()
 	// gene code to file
 	geneFiles()
-
-	// gene commit each file
-
 }
 
 func geneFiles() {
-	questionLang := make(map[int64][][]string)
+	questionLang := make(map[int][][]string)
 	for id, question := range questionIDMap {
 		path := fmt.Sprintf("/%d-%s/", question.FrontendID, question.TitleSlug)
 		if err := os.MkdirAll(settings.Setting.Out+path, os.ModePerm); err != nil {
@@ -71,24 +70,7 @@ func geneFiles() {
 		listLang := make([]string, 0, len(langSubmit))
 		for _, s := range langSubmit {
 			listLang = append(listLang, s.Lang)
-			var suffix string
-			switch s.Lang {
-			case "python3", "python":
-				suffix = "py"
-			case "go":
-				suffix = "go"
-			case "mysql":
-				suffix = "sql"
-			case "c++":
-				suffix = "cpp"
-			case "c":
-				suffix = "c"
-			case "java":
-				suffix = "java"
-			case "JavaScript":
-				suffix = "js"
-			}
-			codePath := path + question.TitleSlug + "." + s.Lang + "." + suffix
+			codePath := path + question.TitleSlug + "." + s.Lang + "." + getLangSuffix(s.Lang)
 			questionLangInfo = append(questionLangInfo, []string{s.Lang, codePath})
 			if _, err := os.Stat(settings.Setting.Out + codePath); !os.IsNotExist(err) {
 				continue
@@ -96,50 +78,119 @@ func geneFiles() {
 			if err := ioutil.WriteFile(settings.Setting.Out+codePath, []byte(s.Code), 0644); err != nil {
 				log.Printf("write file error: %v", err)
 			}
+			cmd := exec.Command("git", "add", settings.Setting.Out+codePath)
+			cmd.Dir = settings.Setting.Out
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				fmt.Println(err)
+			}
+			cmd2 := exec.Command("git", "commit", "--date", time.Unix(s.Timestamp, 0).Format("2006-01-02 15:04:05"), "-m", fmt.Sprintf("%s %s solution", question.TitleSlug, s.Lang))
+			cmd2.Dir = settings.Setting.Out
+			cmd2.Stdout = os.Stdout
+			cmd2.Stderr = os.Stderr
+			if err := cmd2.Run(); err != nil {
+				fmt.Println(err)
+			}
 		}
 		questionLang[id] = questionLangInfo
 		sort.Strings(listLang)
-		readmePath := path + "README.md"
-		readme := fmt.Sprintf("# %s\n\n## Question\n%s \n## Solution\n", question.Title, question.Content)
-		for _, lang := range listLang {
-			readme += fmt.Sprintf("### %s\n ```%s\n%s\n``` \n", lang, lang, langSubmit[lang].Code)
-		}
-		readme += "## Author \nEINDEX"
-		if err := ioutil.WriteFile(settings.Setting.Out+readmePath, []byte(readme), 0644); err != nil {
-			log.Printf("write file error: %v", err)
-		}
-		readmeCNPath := path + "README-ZH.md"
-		readmeCN := fmt.Sprintf("# %s\n\n## 问题\n%s \n## 解法\n", question.TranslatedTitle, question.TranslatedContent)
-		for _, lang := range listLang {
-			readmeCN += fmt.Sprintf("### %s\n ```%s\n%s\n``` \n", lang, lang, langSubmit[lang].Code)
-		}
-		readmeCN += "## 作者 \nEINDEX"
-		if err := ioutil.WriteFile(settings.Setting.Out+readmeCNPath, []byte(readmeCN), 0644); err != nil {
-			log.Printf("write file error: %v", err)
-		}
 
-		allReadme := "# LeetCode"
-		allReadme += `
-| # | Problems | Solutions |
-|:--:|:-----:|:---------:|
-`
-		for i := 0; i < len(questionIDMap); i++ {
-			question, ok := questionIDMap[int64(i)]
-			if !ok {
-				continue
-			}
-			langs := questionLang[question.ID]
+		readmePath := settings.Setting.Out + path + "README.md"
+		questionRender(readmePath, question, langSubmit, listLang)
 
-			langString := ""
-			for _, lang := range langs {
-				langString += fmt.Sprintf("[%s](.%s) ", lang[0], lang[1])
+		if settings.Setting.Enter == "cn" {
+			readmeCNPath := settings.Setting.Out + path + "README-ZH.md"
+			questionRender(readmeCNPath, question, langSubmit, listLang)
+		}
+	}
+	keys := make([]int, len(questionIDMap))
+	for i, _ := range questionIDMap {
+		keys = append(keys, i)
+	}
+	sort.Ints(keys)
+
+	solutions := make([]*map[string]interface{}, 0)
+	for _, qid := range keys {
+		if q, ok := questionIDMap[qid]; ok {
+			m := map[string]interface{}{
+				"question": q,
+				"langs":    questionLang[q.ID],
 			}
-			questionURL := fmt.Sprintf("[%s](https://leetcode.com/problems/%s)", question.TitleSlug, question.TitleSlug)
-			allReadme += fmt.Sprintf("|%d|%s|%s|\n", question.FrontendID, questionURL, langString)
+			solutions = append(solutions, &m)
 		}
-		if err := ioutil.WriteFile(settings.Setting.Out+"/"+"README.md", []byte(allReadme), 0644); err != nil {
-			log.Printf("write file error: %v", err)
-		}
+	}
+
+	render(solutions, "README.md", "global")
+	if settings.Setting.Enter == "cn" {
+		render(solutions, "README-ZN.md", "cn")
+	}
+}
+
+func getLangSuffix(lang string) string {
+	var suffix string
+	switch lang {
+	case "python3", "python":
+		suffix = "py"
+	case "go":
+		suffix = "go"
+	case "mysql":
+		suffix = "sql"
+	case "c++":
+		suffix = "cpp"
+	case "c":
+		suffix = "c"
+	case "java":
+		suffix = "java"
+	case "JavaScript":
+		suffix = "js"
+	}
+	return suffix
+}
+
+func questionRender(readmePath string, question *models.Question, langSubmit map[string]*models.Submit, listLang []string) {
+	tmpl, err := template.ParseFiles("template/question_readme.tmpl")
+	if err != nil {
+		log.Fatal(err)
+	}
+	f, err := os.Create(readmePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	err = tmpl.Execute(f, &struct {
+		Question   *models.Question
+		LangSubmit map[string]*models.Submit
+		ListLang   []string
+		Mode       string
+	}{
+		Question:   question,
+		LangSubmit: langSubmit,
+		ListLang:   listLang,
+	})
+}
+
+func render(solutions []*map[string]interface{}, filename, mode string) {
+	temp, err := template.ParseFiles("template/readme.tmpl")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	f, err := os.Create(settings.Setting.Out + "/" + filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f.Close()
+	err = temp.Execute(f, &struct {
+		Time     string
+		Solution []*map[string]interface{}
+		Mode     string
+	}{
+		Time:     time.Now().Format("2006-01-02"),
+		Solution: solutions,
+		Mode:     mode,
+	})
+	if err != nil {
+		log.Fatal(err)
 	}
 }
 
