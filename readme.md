@@ -10,7 +10,7 @@
 go get github.com/eindex/leetcode-spider-go
 ```
 
-或者下载对应系统的 release 版本。
+或者下载对应系统的 [release](https://github.com/EINDEX/leetcode-spider-go/releases) 版本。
 
 ## Usage
 
