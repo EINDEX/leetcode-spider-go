@@ -1,6 +1,9 @@
 # .travis.yml
 language: go
 
+env:
+  - GO111MODULE=on
+
 # calls goreleaser
 deploy:
   - provider: script
