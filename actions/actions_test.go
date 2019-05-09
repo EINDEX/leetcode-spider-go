@@ -2,7 +2,7 @@ package actions
 
 import (
 	"fmt"
-	"leetcode-tools/settings"
+	"leetcode-spider-go/settings"
 	"net/url"
 	"testing"
 )

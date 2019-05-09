@@ -1,8 +1,8 @@
 package utils
 
 import (
-	"leetcode-tools/models"
-	"leetcode-tools/settings"
+	"leetcode-spider-go/models"
+	"leetcode-spider-go/settings"
 	"log"
 	"os"
 	"text/template"

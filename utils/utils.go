@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"leetcode-tools/settings"
+	"leetcode-spider-go/settings"
 	"mime/multipart"
 	"os"
 	"os/exec"

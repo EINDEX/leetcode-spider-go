@@ -1,4 +1,4 @@
-module leetcode-tools
+module leetcode-spider-go
 
 go 1.12
 
