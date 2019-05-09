@@ -3,6 +3,7 @@ language: go
 go:
   - 1.12.x
 
+script: echo 'leetcode-spider-go!'
 
 env:
   - GO111MODULE=on
