@@ -35,7 +35,7 @@ func main() {
 	}
 	log.Println("finish to sync questions status")
 
-	for i, question := range questions[:10] {
+	for i, question := range questions {
 		// find questions ac
 		question = checkQuestion(question)
 		if question == nil {
