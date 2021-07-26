@@ -3,12 +3,13 @@ package models
 import "fmt"
 
 type Question struct {
-	ID         int `json:"questionId,string"`
-	FrontendID int `json:"questionFrontendId,string"`
+	ID         int    `json:"questionId,string"`
+	FrontendID string `json:"questionFrontendId"`
 	Title      string
 	TitleSlug  string
 	Content    string
 	Difficulty string
+	IsPaidOnly bool
 
 	TranslatedTitle   string
 	TranslatedContent string
@@ -37,13 +38,11 @@ type Submit struct {
 }
 
 func (question *Question) String() string {
-	return fmt.Sprintf(`Question %d %s status:%s
-Tags: %v
-Submits: %v`, question.FrontendID, question.TitleSlug, question.Status, question.Tags, question.Submits)
+	return fmt.Sprintf(`Question %s %s status:%s Tags: %v`, question.FrontendID, question.Title, question.Status, question.Tags)
 }
 
 func (tag *Tag) String() string {
-	return fmt.Sprintf("Tag %s Name: %s, TranslatedName: %s", tag.Slug, tag.Name, tag.TranslatedName)
+	return fmt.Sprintf("Tag %s Name: %s", tag.Slug, tag.Name)
 }
 
 func (submit *Submit) String() string {

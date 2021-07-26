@@ -69,3 +69,4 @@ fabric.properties
 settings.toml
 .idea
 /leetcode.data.json
+/leetcode

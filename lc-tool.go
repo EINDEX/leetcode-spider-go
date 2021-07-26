@@ -28,32 +28,40 @@ func main() {
 
 	actions.User.Login(settings.Setting.Username, settings.Setting.Password)
 	// get question status
-	log.Println("开始同步问题状态")
+	log.Println("start to sync questions status")
 	questions, err := actions.User.GetAllQuestionStatus()
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("同步问题状态完成")
+	log.Println("finish to sync questions status")
 
-	for _, question := range questions {
+	for i, question := range questions {
 		// find questions ac
 		question = checkQuestion(question)
 		if question == nil {
 			continue
 		}
-		log.Printf("处理题目: %d, %s", question.ID, question.Title)
+
+		if question.IsPaidOnly {
+			log.Printf("pass paid question: %s\n", question)
+			continue
+		}
+
+		log.Printf("process question: %d.%s", question.ID, question.Title)
 
 		fetchQuestionSubmitCode(question)
+		if i%10 == 0 {
+			save()
+		}
 	}
 	save()
-	// gene code to file
 	geneFiles()
 }
 
 func geneFiles() {
 	questionLang := make(map[int][][]string)
 	for id, question := range questionIDMap {
-		path := fmt.Sprintf("/%d-%s/", question.FrontendID, question.TitleSlug)
+		path := fmt.Sprintf("/%d-%s/", question.ID, question.TitleSlug)
 		if err := os.MkdirAll(settings.Setting.Out+path, os.ModePerm); err != nil {
 			panic(err)
 		}
@@ -93,7 +101,7 @@ func geneFiles() {
 		}
 	}
 	keys := make([]int, len(questionIDMap))
-	for i, _ := range questionIDMap {
+	for i := range questionIDMap {
 		keys = append(keys, i)
 	}
 	sort.Ints(keys)
@@ -124,20 +132,21 @@ func fetchQuestionSubmitCode(question *models.Question) {
 		if !hasNext {
 			break
 		}
-		log.Printf("获取 %d, %s 提交状态 ", question.ID, question.Title)
+		log.Printf("fetch %d.%s submit status ", question.ID, question.Title)
 		pageSubmits, newLastKey, err := actions.User.GetSubmitHistory(1, lastKey, question.TitleSlug)
 		if err != nil {
 			times -= 1
 			if times < 0 {
 				break
 			}
+			time.Sleep(1 * time.Second)
 			continue
 		}
 		if len(pageSubmits) < 20 {
 			hasNext = false
 		}
 		lastKey = newLastKey
-		log.Printf("答案数量 %d", len(pageSubmits))
+		log.Printf("nums of answers: %d", len(pageSubmits))
 		for _, submit := range pageSubmits {
 			if submit.StatusDisplay != "Accepted" {
 				continue
@@ -145,7 +154,7 @@ func fetchQuestionSubmitCode(question *models.Question) {
 			if _, ok := submitIDMap[submit.ID]; ok {
 				continue
 			}
-			log.Printf("下载 %d, %s submit %d 代码 ", question.ID, question.Title, submit.ID)
+			log.Printf("download %d.%s submit %d code ", question.ID, question.Title, submit.ID)
 			if question.Submits == nil {
 				question.Submits = make(map[int64]*models.Submit)
 			}
@@ -227,11 +236,11 @@ func save() {
 }
 
 func recovery() {
-	log.Println("开始数据恢复")
+	log.Println("starting to load backup data")
 	file, err := os.Open(settings.Setting.SaveFile)
 	if err != nil {
 		log.Printf("%v", err)
-		log.Println("跳过恢复")
+		log.Println(": skip loading backup data")
 		return
 	}
 	defer file.Close()

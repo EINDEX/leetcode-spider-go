@@ -43,7 +43,7 @@ func GetLangSuffix(lang string) string {
 	switch lang {
 	case "python3", "python":
 		suffix = "py"
-	case "go":
+	case "golang":
 		suffix = "go"
 	case "mysql":
 		suffix = "sql"

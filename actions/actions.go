@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"regexp"
 	"strings"
 )
 
@@ -51,7 +50,7 @@ func init() {
 	}
 	graphQL = baseURL + "graphql/"
 	loginURL = baseURL + "accounts/login/"
-	resp, _ := User.client.Get(loginURL)
+	resp, _ := User.client.Get(graphQL)
 	defer resp.Body.Close()
 }
 
@@ -104,8 +103,8 @@ func (u *user) Login(username, password string) {
 	}
 	request.Header.Add("x-csrftoken", u.getCsrfToken())
 	request.Header.Add("x-requested-with", "XMLHttpRequest")
-	request.Header.Add("referer", baseURL+"accounts/login/?next=%2Fproblems%2Fall%2F")
-	request.Header.Add("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36")
+	request.Header.Add("Referer", loginURL)
+	request.Header.Add("Origin", baseURL)
 	request.Header.Add("content-type", header)
 
 	resp, err := u.client.Do(request)
@@ -141,7 +140,6 @@ func (u *user) GetAllQuestionStatus() (data []*models.Question, err error) {
 		return nil, err
 	}
 	res := gjson.GetBytes(body, "data.allQuestions")
-
 	if err := json.Unmarshal([]byte(res.String()), &data); err != nil {
 		return nil, err
 	}
@@ -159,10 +157,10 @@ func (u *user) GetSubmitHistory(page int, lastKey string, slug string) (data []*
 		lastKey = "\n" + lastKey + "\n"
 	}
 	if slug == "" {
-		query = "{\"query\":\"query Submissions($offset: Int!, $limit: Int!, $lastKey: String) {\\n  submissionList(offset: $offset, limit: $limit, lastKey: $lastKey) {\\n    lastKey\\n    hasNext\\n    submissions {\\n      id\\n      statusDisplay\\n      lang\\n      runtime\\n      timestamp\\n      url\\n      isPending\\n      memory\\n      __typename\\n    }\\n    __typename\\n  }\\n}\\n\",\"variables\":{\"offset\":%d,\"limit\":%d,\"lastKey\":%s},\"operationName\":\"Submissions\"}"
+		query = "{\"query\":\"query submissions($offset: Int!, $limit: Int!, $lastKey: String) {\\n  submissionList(offset: $offset, limit: $limit, lastKey: $lastKey) {\\n    lastKey\\n    hasNext\\n    submissions {\\n      id\\n      statusDisplay\\n      lang\\n      runtime\\n      timestamp\\n      url\\n      isPending\\n      memory\\n      __typename\\n    }\\n    __typename\\n  }\\n}\\n\",\"variables\":{\"offset\":%d,\"limit\":%d,\"lastKey\":%s},\"operationName\":\"submissions\"}"
 		query = fmt.Sprintf(query, offset, pageSize, lastKey)
 	} else {
-		query = "{\"query\":\"query Submissions($offset: Int!, $limit: Int!, $lastKey: String, $questionSlug: String!) {\\n  submissionList(offset: $offset, limit: $limit, lastKey: $lastKey, questionSlug: $questionSlug) {\\n    lastKey\\n    hasNext\\n    \\n    submissions {\\n      id\\n      statusDisplay\\n      lang\\n      runtime\\n      timestamp\\n      url\\n      title\\n\\n      isPending\\n      memory\\n      __typename\\n      \\n    }\\n    __typename\\n  }\\n}\\n\",\"variables\":{\"offset\":%d,\"limit\":%d,\"lastKey\":%s,\"questionSlug\":\"%s\"},\"operationName\":\"Submissions\"}"
+		query = "{\"query\":\"query submissions($offset: Int!, $limit: Int!, $lastKey: String, $questionSlug: String!, $markedOnly: Boolean, $lang: String) {\\n  submissionList(offset: $offset, limit: $limit, lastKey: $lastKey, questionSlug: $questionSlug, markedOnly: $markedOnly, lang: $lang) {\\n    lastKey\\n    hasNext\\n    \\n    submissions {\\n      id\\n      statusDisplay\\n      lang\\n      runtime\\n      timestamp\\n      url\\n      title\\n\\n      isPending\\n      memory\\n      __typename\\n      \\n    }\\n    __typename\\n  }\\n}\\n\",\"variables\":{\"offset\":%d,\"limit\":%d,\"lastKey\":%s,\"questionSlug\":\"%s\"},\"operationName\":\"submissions\"}"
 		query = fmt.Sprintf(query, offset, pageSize, lastKey, slug)
 	}
 	req := u.geneGraphQLRequest(strings.NewReader(query))
@@ -212,16 +210,9 @@ func (u *user) GetQuestionDetail(questionSlug string) (question *models.Question
 }
 
 func (u *user) GetSubmitDetail(submitID int64) (data string, err error) {
-	submitURL := baseURL + fmt.Sprintf("submissions/detail/%d/", submitID)
-	req, err := http.NewRequest("GET", submitURL, nil)
-	if err != nil {
-		return
-	}
-	req.Header.Add("content-type", "application/json")
-	req.Header.Add("x-csrftoken", u.getCsrfToken())
-	req.Header.Add("referer", "https://leetcode.com")
-	req.Header.Add("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36")
-
+	query := "{\"operationName\":\"mySubmissionDetail\",\"variables\":{\"id\":\"%d\"},\"query\":\"query mySubmissionDetail($id: ID!) {\\n  submissionDetail(submissionId: $id) {\\n    id\\n    code\\n    runtime\\n    memory\\n    rawMemory\\n    statusDisplay\\n    timestamp\\n    lang\\n    passedTestCaseCnt\\n    totalTestCaseCnt\\n    sourceUrl\\n    question {\\n      titleSlug\\n      title\\n      translatedTitle\\n      questionId\\n      __typename\\n    }\\n    ... on GeneralSubmissionNode {\\n      outputDetail {\\n        codeOutput\\n        expectedOutput\\n        input\\n        compileError\\n        runtimeError\\n        lastTestcase\\n        __typename\\n      }\\n      __typename\\n    }\\n    submissionComment {\\n      comment\\n      flagType\\n      __typename\\n    }\\n    __typename\\n  }\\n}\\n\"}"
+	query = fmt.Sprintf(query, submitID)
+	req := u.geneGraphQLRequest(strings.NewReader(query))
 	resp, err := u.client.Do(req)
 	if err != nil {
 		log.Fatalf("Get Submit Detail Failed %v\n", err)
@@ -233,16 +224,8 @@ func (u *user) GetSubmitDetail(submitID int64) (data string, err error) {
 	if err != nil {
 		return "", err
 	}
-	re := regexp.MustCompile("submissionCode:\\s'([^']*)'")
-	matchs := re.FindStringSubmatch(string(body))
-	if len(matchs) < 1 {
-		return "", err
-	}
-	var code string
-	if err := json.Unmarshal([]byte("\""+matchs[1]+"\""), &code); err != nil {
-		log.Printf("%v", err)
-	}
-	return code, nil
+	data = gjson.GetBytes(body, "data.submissionDetail.code").String()
+	return
 
 	//todo runtimeDistributionFormatted what best leetcode
 	// re := regexp.MustCompile("runtimeDistributionFormatted:\\s('[^']+')")
