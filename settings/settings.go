@@ -2,7 +2,8 @@ package settings
 
 import (
 	"fmt"
-	"github.com/BurntSushi/toml"
+	"github.com/spf13/viper"
+	"strings"
 )
 
 var Setting setting
@@ -16,11 +17,26 @@ type setting struct {
 }
 
 func init() {
-	if _, err := toml.DecodeFile("settings.toml", &Setting); err != nil {
-		fmt.Errorf("%v", err)
-		return
+	viper.SetDefault("leetcode.enter", "cn")
+	viper.SetDefault("out", ".")
+	viper.SetDefault("datafile", "data.json")
+	viper.SetConfigName("settings")
+	viper.SetConfigType("toml")
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("$HOME/.lctool")
+	viper.SetEnvPrefix("lctool")
+	//viper.BindEnv("leetcode.username")
+	//viper.BindEnv("leetcode.password")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.AutomaticEnv()
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Errorf("find settings.toml failed, %v", err)
 	}
-	if Setting.Out[len(Setting.Out)-1] == '/' {
-		Setting.Out = Setting.Out[:len(Setting.Out)-1]
+	Setting = setting{
+		Enter:    viper.GetString("leetcode.enter"),
+		Username: viper.GetString("leetcode.username"),
+		Password: viper.GetString("leetcode.password"),
+		SaveFile: viper.GetString("datafile"),
+		Out:      viper.GetString("out"),
 	}
 }

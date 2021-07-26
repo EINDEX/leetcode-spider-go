@@ -1,5 +1,6 @@
-enter="golbal" # golbal/cn
-username="username"
-password="password"
-savefile="leetcode.data.json"
-out="out path"
+[leetcode]
+    #enter="golbal" # golbal/cn
+    username="username"
+    password="password"
+    #savefile="leetcode.data.json"
+    #out="out path"

@@ -89,7 +89,6 @@ func (u *user) Login(username, password string) {
 		"csrfmiddlewaretoken": strings.NewReader(u.getCsrfToken()),
 		"login":               strings.NewReader(username),
 		"password":            strings.NewReader(password),
-		"next":                strings.NewReader("/problems"),
 	}
 	buffer, header, err := utils.GetMultipartForm(values)
 	if err != nil {

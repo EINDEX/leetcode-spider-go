@@ -35,7 +35,7 @@ func main() {
 	}
 	log.Println("finish to sync questions status")
 
-	for i, question := range questions {
+	for i, question := range questions[:10] {
 		// find questions ac
 		question = checkQuestion(question)
 		if question == nil {
@@ -61,7 +61,7 @@ func main() {
 func geneFiles() {
 	questionLang := make(map[int][][]string)
 	for id, question := range questionIDMap {
-		path := fmt.Sprintf("/%d-%s/", question.ID, question.TitleSlug)
+		path := fmt.Sprintf("/leetcode/%d-%s/", question.ID, question.TitleSlug)
 		if err := os.MkdirAll(settings.Setting.Out+path, os.ModePerm); err != nil {
 			panic(err)
 		}
@@ -239,8 +239,7 @@ func recovery() {
 	log.Println("starting to load backup data")
 	file, err := os.Open(settings.Setting.SaveFile)
 	if err != nil {
-		log.Printf("%v", err)
-		log.Println(": skip loading backup data")
+		log.Printf("%v: skip loading backup data", err)
 		return
 	}
 	defer file.Close()
