@@ -56,7 +56,6 @@ func init() {
 
 func (u *user) geneGraphQLRequest(query io.Reader) (request *http.Request) {
 	request, err := http.NewRequest("POST", graphQL, query)
-	//fmt.Print(request.Header)
 	if err != nil || request == nil {
 		log.Fatalf("gene request fatal")
 		return
@@ -94,7 +93,6 @@ func (u *user) Login(username, password string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	request, err := http.NewRequest("POST", loginURL, &buffer)
 	if err != nil || request == nil {
 		log.Fatalf("%s Login Failed! %v\n", username, err)

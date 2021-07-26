@@ -25,8 +25,6 @@ func init() {
 	viper.AddConfigPath(".")
 	viper.AddConfigPath("$HOME/.lctool")
 	viper.SetEnvPrefix("lctool")
-	//viper.BindEnv("leetcode.username")
-	//viper.BindEnv("leetcode.password")
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 	if err := viper.ReadInConfig(); err != nil {
