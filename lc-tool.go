@@ -31,8 +31,8 @@ func main() {
 	recovery()
 
 	actions.User.Login(settings.Setting.Username, settings.Setting.Password)
-	//updateViaQuestionFetchAction(actions.User.GetAllQuestionStatus)
-	//updateViaQuestionFetchAction(actions.User.GetRecentSubmission)
+	updateViaQuestionFetchAction(actions.User.GetAllQuestionStatus)
+	updateViaQuestionFetchAction(actions.User.GetRecentSubmission)
 
 	geneFiles()
 

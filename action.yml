@@ -8,17 +8,6 @@ inputs:
     description: "leetcode password"
     required: true
 
-outputs:
-  hard:
-    description: "nums of hard"
-    value: ${{ step.fetch-status.outputs.hard }}
-  mid:
-    description: "nums of mid"
-    value: ${{ step.fetch-status.outputs.mid }}
-  easy:
-    description: "nums of easy"
-    value: ${{ step.fetch-status }}
-
 runs:
   using: "composite"
   steps:
