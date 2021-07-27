@@ -49,10 +49,10 @@ func updateViaQuestionFetchAction(questionFetchFunc func() ([]*models.Question, 
 
 func fetchSubmits(questions []*models.Question, force bool) {
 	for _, question := range questions {
-		question = checkQuestion(question)
-		if !force && question == nil {
+		if !force && !shouldUpdateQuestion(question) {
 			continue
 		}
+		fillQuestionContent(question)
 		log.Printf("process question: %d.%s", question.ID, question.Title)
 		fetchQuestionSubmitCode(question)
 	}
@@ -177,16 +177,14 @@ func fetchQuestionSubmitCode(question *models.Question) {
 	}
 }
 
-func checkQuestion(question *models.Question) *models.Question {
-	q, ok := questionIDMap[question.ID]
-	if !ok || (strings.ToUpper(question.Status) == "AC" &&
-		(strings.ToUpper(q.Status) != strings.ToUpper(question.Status))) {
+func shouldUpdateQuestion(question *models.Question) bool {
+	_, ok := questionIDMap[question.ID]
+	if !ok && question.Status == "ac" {
 		questionIDMap[question.ID] = question
 		questionSlugMap[question.TitleSlug] = question
-		fillQuestionContent(question)
-		return question
+		return true
 	}
-	return nil
+	return false
 }
 
 func fillQuestionContent(question *models.Question) {
