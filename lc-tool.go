@@ -31,37 +31,29 @@ func main() {
 	recovery()
 
 	actions.User.Login(settings.Setting.Username, settings.Setting.Password)
-	updateViaQuestionFetchAction(actions.User.GetAllQuestionStatus)
-	updateViaQuestionFetchAction(actions.User.GetRecentSubmission)
+	updateViaQuestionFetchAction(actions.User.GetAllQuestionStatus, false)
+	updateViaQuestionFetchAction(actions.User.GetRecentSubmission, true)
 
 	geneFiles()
 
 }
 
-func updateViaQuestionFetchAction(questionFetchFunc func() ([]*models.Question, error)) {
+func updateViaQuestionFetchAction(questionFetchFunc func() ([]*models.Question, error), force bool) {
 	questions, err := questionFetchFunc()
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	fetchSubmits(questions)
+	fetchSubmits(questions, force)
 }
 
-func fetchSubmits(questions []*models.Question) {
+func fetchSubmits(questions []*models.Question, force bool) {
 	for _, question := range questions {
-		// find questions ac
 		question = checkQuestion(question)
-		if question == nil {
+		if !force && question == nil {
 			continue
 		}
-
-		if question.IsPaidOnly {
-			log.Printf("pass paid question: %s\n", question)
-			continue
-		}
-
 		log.Printf("process question: %d.%s", question.ID, question.Title)
-
 		fetchQuestionSubmitCode(question)
 	}
 	save()
@@ -187,13 +179,13 @@ func fetchQuestionSubmitCode(question *models.Question) {
 
 func checkQuestion(question *models.Question) *models.Question {
 	q, ok := questionIDMap[question.ID]
-	if !ok {
+	if !ok || (question.Status != "" && q.Status != question.Status) {
 		questionIDMap[question.ID] = question
 		questionSlugMap[question.TitleSlug] = question
 		fillQuestionContent(question)
-		q = question
+		return question
 	}
-	return q
+	return nil
 }
 
 func fillQuestionContent(question *models.Question) {
