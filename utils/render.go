@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"io/fs"
 	"leetcode-spider-go/models"
 	"leetcode-spider-go/settings"
 	"log"
@@ -9,8 +10,8 @@ import (
 	"time"
 )
 
-func QuestionRender(readmePath string, question *models.Question, langSubmit map[string]*models.Submit, listLang []string) {
-	tmpl, err := template.ParseFiles("template/question_readme.tmpl")
+func QuestionRender(fs fs.FS, readmePath string, question *models.Question, langSubmit map[string]*models.Submit, listLang []string) {
+	tmpl, err := template.ParseFS(fs, "template/question_readme.tmpl")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -31,8 +32,8 @@ func QuestionRender(readmePath string, question *models.Question, langSubmit map
 	})
 }
 
-func Render(solutions []*map[string]interface{}, filename, mode string) {
-	temp, err := template.ParseFiles("template/readme.tmpl")
+func ReadmeRender(fs fs.FS, solutions []*map[string]interface{}, filename, mode string) {
+	temp, err := template.ParseFS(fs, "template/readme.tmpl")
 	if err != nil {
 		log.Fatalln(err)
 	}

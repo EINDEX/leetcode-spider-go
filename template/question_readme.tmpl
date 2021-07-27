@@ -2,15 +2,13 @@
 
 ## Difficulty
 {{ .Question.Difficulty }}
-
+{{ if eq .Question.IsPaidOnly false}}
 ## Question
 {{ .Question.Content }}
+{{ end }}
 
 ## Solution{{ $s:=.LangSubmit }}{{ range $c:=.ListLang }}{{ with index $s $c}}
 ### {{ .Lang }}
 ```{{ .Lang }}
 {{ .Code }}
 ```{{ end }}{{ end }}
-
-## Author
-EINDEX

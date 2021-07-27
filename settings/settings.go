@@ -9,17 +9,21 @@ import (
 var Setting setting
 
 type setting struct {
-	Enter    string
-	Username string
-	Password string
-	SaveFile string
-	Out      string
+	Enter      string
+	Username   string
+	Password   string
+	SaveFile   string
+	Out        string
+	EnableGit  bool
+	EnablePush bool
 }
 
 func init() {
 	viper.SetDefault("leetcode.enter", "cn")
 	viper.SetDefault("out", ".")
 	viper.SetDefault("datafile", "data.json")
+	viper.SetDefault("enable.git", "true")
+	viper.SetDefault("enable.push", "true")
 	viper.SetConfigName("settings")
 	viper.SetConfigType("toml")
 	viper.AddConfigPath(".")
@@ -31,10 +35,12 @@ func init() {
 		fmt.Errorf("find settings.toml failed, %v", err)
 	}
 	Setting = setting{
-		Enter:    viper.GetString("leetcode.enter"),
-		Username: viper.GetString("leetcode.username"),
-		Password: viper.GetString("leetcode.password"),
-		SaveFile: viper.GetString("datafile"),
-		Out:      viper.GetString("out"),
+		Enter:      viper.GetString("leetcode.enter"),
+		Username:   viper.GetString("leetcode.username"),
+		Password:   viper.GetString("leetcode.password"),
+		SaveFile:   viper.GetString("datafile"),
+		Out:        viper.GetString("out"),
+		EnableGit:  viper.GetBool("enable.git"),
+		EnablePush: viper.GetBool("enable.push"),
 	}
 }

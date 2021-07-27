@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"github.com/tidwall/gjson"
@@ -22,20 +23,32 @@ var (
 	submitIDMap     = make(map[int64]*models.Submit)
 )
 
+//go:embed template
+var fs embed.FS
+
 func main() {
 	// recovery local data to map
 	recovery()
 
 	actions.User.Login(settings.Setting.Username, settings.Setting.Password)
-	// get question status
-	log.Println("start to sync questions status")
-	questions, err := actions.User.GetAllQuestionStatus()
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("finish to sync questions status")
+	//updateViaQuestionFetchAction(actions.User.GetAllQuestionStatus)
+	//updateViaQuestionFetchAction(actions.User.GetRecentSubmission)
 
-	for i, question := range questions {
+	geneFiles()
+
+}
+
+func updateViaQuestionFetchAction(questionFetchFunc func() ([]*models.Question, error)) {
+	questions, err := questionFetchFunc()
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	fetchSubmits(questions)
+}
+
+func fetchSubmits(questions []*models.Question) {
+	for _, question := range questions {
 		// find questions ac
 		question = checkQuestion(question)
 		if question == nil {
@@ -50,12 +63,8 @@ func main() {
 		log.Printf("process question: %d.%s", question.ID, question.Title)
 
 		fetchQuestionSubmitCode(question)
-		if i%10 == 0 {
-			save()
-		}
 	}
 	save()
-	geneFiles()
 }
 
 func geneFiles() {
@@ -67,14 +76,16 @@ func geneFiles() {
 		}
 		langSubmit := make(map[string]*models.Submit)
 		for _, submit := range question.Submits {
-			s, ok := langSubmit[submit.Lang]
-			if (ok && s.Runtime > submit.Runtime) || !ok {
-				langSubmit[submit.Lang] = submit
+			lang := strings.Replace(submit.Lang, "python3", "python", -1)
+			s, ok := langSubmit[lang]
+			if (ok && s.RawRuntime() > submit.RawRuntime()) || !ok {
+				langSubmit[lang] = submit
 			}
 		}
 
 		questionLangInfo := make([][]string, 0, len(langSubmit))
 		listLang := make([]string, 0, len(langSubmit))
+		timestamp := int64(0)
 		for _, s := range langSubmit {
 			listLang = append(listLang, s.Lang)
 			codePath := path + question.TitleSlug + "." + s.Lang + "." + utils.GetLangSuffix(s.Lang)
@@ -85,20 +96,18 @@ func geneFiles() {
 			if err := ioutil.WriteFile(settings.Setting.Out+codePath, []byte(s.Code), 0644); err != nil {
 				log.Printf("write file error: %v", err)
 			}
-			if err := utils.ExecCommend("git", "add", settings.Setting.Out+codePath); err != nil {
-				log.Fatalln(err)
-			}
-			if err := utils.ExecCommend("git", "commit", "--date", time.Unix(s.Timestamp, 0).Format("2006-01-02 15:04:05"), "-m", fmt.Sprintf("%s %s solution", question.TitleSlug, s.Lang)); err != nil {
-				log.Fatalln(err)
+			utils.GitAddAndCommand(settings.Setting.Out+path, fmt.Sprintf("%s %s solution", question.TitleSlug, s.Lang), s.Timestamp)
+			if s.Timestamp > timestamp {
+				timestamp = s.Timestamp
 			}
 		}
 		questionLang[id] = questionLangInfo
 		sort.Strings(listLang)
-
-		utils.QuestionRender(settings.Setting.Out+path+"README.md", question, langSubmit, listLang)
+		utils.QuestionRender(fs, settings.Setting.Out+path+"README.md", question, langSubmit, listLang)
 		if settings.Setting.Enter == "cn" {
-			utils.QuestionRender(settings.Setting.Out+path+"README-ZH.md", question, langSubmit, listLang)
+			utils.QuestionRender(fs, settings.Setting.Out+path+"README-ZH.md", question, langSubmit, listLang)
 		}
+		utils.GitAddAndCommand(settings.Setting.Out+path, fmt.Sprintf("%s solution", question.TitleSlug), timestamp)
 	}
 	keys := make([]int, len(questionIDMap))
 	for i := range questionIDMap {
@@ -117,9 +126,13 @@ func geneFiles() {
 		}
 	}
 
-	utils.Render(solutions, "README.md", "global")
+	utils.ReadmeRender(fs, solutions, "README.md", "global")
 	if settings.Setting.Enter == "cn" {
-		utils.Render(solutions, "README-ZN.md", "cn")
+		utils.ReadmeRender(fs, solutions, "README-ZH.md", "cn")
+	}
+	if settings.Setting.EnablePush {
+		utils.GitAddAndCommand(settings.Setting.Out, "generate readme", 0)
+		utils.GitPush()
 	}
 }
 
@@ -173,33 +186,12 @@ func fetchQuestionSubmitCode(question *models.Question) {
 }
 
 func checkQuestion(question *models.Question) *models.Question {
-	flag := true
 	q, ok := questionIDMap[question.ID]
-	if question.Status == "ac" {
-		if ok {
-			if q.Status == "ac" {
-				flag = false
-			} else {
-				q.Status = "ac"
-			}
-		} else {
-			questionIDMap[question.ID] = question
-			questionSlugMap[question.TitleSlug] = question
-			q = question
-		}
-	} else {
-		return nil
-	}
-	if settings.Setting.Enter == "cn" {
-		q.TranslatedTitle = question.TranslatedTitle
-		if q.TranslatedContent == "" {
-			fillQuestionContent(q)
-		}
-	} else if q.Content == "" {
-		fillQuestionContent(q)
-	}
-	if !flag {
-		return nil
+	if !ok {
+		questionIDMap[question.ID] = question
+		questionSlugMap[question.TitleSlug] = question
+		fillQuestionContent(question)
+		q = question
 	}
 	return q
 }

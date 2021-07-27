@@ -1,6 +1,11 @@
 package models
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+	"regexp"
+	"strconv"
+)
 
 type Question struct {
 	ID         int    `json:"questionId,string"`
@@ -47,4 +52,13 @@ func (tag *Tag) String() string {
 
 func (submit *Submit) String() string {
 	return fmt.Sprintf("Submit %d lang: %s, status: %s", submit.ID, submit.Lang, submit.StatusDisplay)
+}
+
+func (submit *Submit) RawRuntime() int {
+	rawRuntimeRe := regexp.MustCompile(`(?m)(\d+) ms`)
+	rawRuntime, err := strconv.Atoi(rawRuntimeRe.FindString(submit.Runtime))
+	if err != nil {
+		return math.MaxInt32
+	}
+	return rawRuntime
 }

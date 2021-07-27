@@ -6,5 +6,5 @@
 {{$m:=.Mode}}
 | # | Problems | Difficulty | Solutions |
 |:--:|:-----:|:---:|:---------:|
-{{ range .Solution }}{{ with $q:=( index . "question")}}| {{ $q.FrontendID }} | [{{ if eq $m "cn" }}{{ .TranslatedTitle }}{{ else }}{{ .TitleSlug }}{{ end }}](https://leetcode.com/ploblems/{{ .TitleSlug }})| {{ .Difficulty }} {{end}}| {{with (index . "langs")}}{{range .}}[{{index . 0}}](.{{index . 1}}) {{end}}{{end}}|
+{{ range .Solution }}{{ with $q:=( index . "question")}}| {{ $q.FrontendID }} | [{{ if eq $m "cn" }}{{ .TranslatedTitle }}{{ else }}{{ .TitleSlug }}{{ end }}](https://leetcode{{ if eq $m "cn" }}-cn{{ end }}.com/problems/{{ .TitleSlug }}/)| {{ .Difficulty }} {{end}}| {{with (index . "langs")}}{{range .}}[{{index . 0}}](.{{index . 1}}) {{end}}{{end}}|
 {{ end}}

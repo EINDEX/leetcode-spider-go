@@ -25,8 +25,9 @@ var (
 )
 
 type user struct {
-	status int
-	client *http.Client
+	status   int
+	client   *http.Client
+	userSlug string
 }
 
 func init() {
@@ -223,10 +224,50 @@ func (u *user) GetSubmitDetail(submitID int64) (data string, err error) {
 	}
 	data = gjson.GetBytes(body, "data.submissionDetail.code").String()
 	return
+}
 
-	//todo runtimeDistributionFormatted what best leetcode
-	// re := regexp.MustCompile("runtimeDistributionFormatted:\\s('[^']+')")
+func (u *user) getUserSlug() (userSlug string, err error) {
+	if u.userSlug != "" {
+		return u.userSlug, nil
+	}
 
-	//todo memoryDistributionFormatted waat best leetcode
-	// re := regexp.MustCompile("memoryDistributionFormatted:\\s('[^']+')")
+	query := "{\"operationName\":\"globalData\",\"variables\":{},\"query\":\"query globalData {\\n  feature {\\n    questionTranslation\\n    subscription\\n    signUp\\n    discuss\\n    mockInterview\\n    contest\\n    store\\n    book\\n    chinaProblemDiscuss\\n    socialProviders\\n    studentFooter\\n    cnJobs\\n    interview\\n    enableLsp\\n    enableWs\\n    enableDebugger\\n    enableDebuggerAdmin\\n    enableDarkMode\\n    tasks\\n    leetbook\\n    enableEduDiscount\\n    __typename\\n  }\\n  userStatus {\\n    isSignedIn\\n    isAdmin\\n    isStaff\\n    isSuperuser\\n    isTranslator\\n    isPremium\\n    isVerified\\n    isPhoneVerified\\n    isWechatVerified\\n    checkedInToday\\n    username\\n    realName\\n    userSlug\\n    groups\\n    avatar\\n    optedIn\\n    requestRegion\\n    region\\n    socketToken\\n    activeSessionId\\n    permissions\\n    notificationStatus {\\n      lastModified\\n      numUnread\\n      __typename\\n    }\\n    completedFeatureGuides\\n    useTranslation\\n    accountStatus {\\n      isFrozen\\n      inactiveAfter\\n      __typename\\n    }\\n    subscriptionPlanType\\n    __typename\\n  }\\n  siteRegion\\n  chinaHost\\n  websocketUrl\\n  userBannedInfo {\\n    bannedData {\\n      endAt\\n      bannedType\\n      __typename\\n    }\\n    __typename\\n  }\\n  commonNojPermissionTypes\\n  jobsMyCompany {\\n    name\\n    nameSlug\\n    __typename\\n  }\\n  myLastCompanyClaimApplication(status: PENDING) {\\n    id\\n    name\\n    countryCode\\n    phone\\n    department\\n    jobTitle\\n    createdAt\\n    opinion\\n    reviewedAt\\n    claimType\\n    status\\n    companyTag {\\n      name\\n      translatedName\\n      slug\\n      __typename\\n    }\\n    authorization\\n    businessLicense\\n    __typename\\n  }\\n}\\n\"}"
+	req := u.geneGraphQLRequest(strings.NewReader(query))
+	resp, err := u.client.Do(req)
+	if err != nil {
+		log.Fatalf("Get Recent Submission Failed %v\n", err)
+		return
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+	return gjson.GetBytes(body, "data.userStatus.userSlug").Str, nil
+}
+
+func (u *user) GetRecentSubmission() (data []*models.Question, err error) {
+	log.Println("Starting to fetch recent submission.")
+	userSlug, err := u.getUserSlug()
+	if err != nil {
+		return nil, err
+	}
+	query := "{\"operationName\":\"recentSubmissions\",\"variables\":{\"userSlug\":\"%s\"},\"query\":\"query recentSubmissions($userSlug: String\\u0021) {\\n  recentSubmissions(userSlug: $userSlug) {\\n    status\\n    lang\\n    source {\\n      sourceType\\n      ... on SubmissionSrcLeetbookNode {\\n        slug\\n        title\\n        pageId\\n        __typename\\n      }\\n      __typename\\n    }\\n    question {\\n questionId \\n      questionFrontendId\\n      title\\n      translatedTitle\\n      titleSlug\\n      __typename\\n    }\\n    submitTime\\n    __typename\\n  }\\n}\\n\"}"
+	query = fmt.Sprintf(query, userSlug)
+	req := u.geneGraphQLRequest(strings.NewReader(query))
+	resp, err := u.client.Do(req)
+	if err != nil {
+		log.Fatalf("Get Recent Submission Failed %v\n", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	res := gjson.GetBytes(body, "data.recentSubmissions.#(status==A_10)#.question")
+	if err := json.Unmarshal([]byte(res.String()), &data); err != nil {
+		return nil, err
+	}
+	return
 }

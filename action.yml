@@ -1,0 +1,29 @@
+name: "lc-tool"
+description: "automatic sync leetcode status"
+inputs:
+  leetcode_username:
+    description: "leetcode username"
+    required: true
+  leetcode_password:
+    description: "leetcode password"
+    required: true
+
+outputs:
+  hard:
+    description: "nums of hard"
+    value: ${{ step.fetch-status.outputs.hard }}
+  mid:
+    description: "nums of mid"
+    value: ${{ step.fetch-status.outputs.mid }}
+  easy:
+    description: "nums of easy"
+    value: ${{ step.fetch-status }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Download lc-tool
+      shell: bash
+    - id: fetch-status
+      name: Run LC Tool generate report
+      shell: bash
