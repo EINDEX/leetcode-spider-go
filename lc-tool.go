@@ -179,7 +179,8 @@ func fetchQuestionSubmitCode(question *models.Question) {
 
 func checkQuestion(question *models.Question) *models.Question {
 	q, ok := questionIDMap[question.ID]
-	if !ok || (question.Status != "" && q.Status != question.Status) {
+	if !ok || (strings.ToUpper(question.Status) == "AC" &&
+		(strings.ToUpper(q.Status) != strings.ToUpper(question.Status))) {
 		questionIDMap[question.ID] = question
 		questionSlugMap[question.TitleSlug] = question
 		fillQuestionContent(question)
