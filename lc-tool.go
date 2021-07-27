@@ -79,7 +79,7 @@ func geneFiles() {
 		listLang := make([]string, 0, len(langSubmit))
 		timestamp := int64(0)
 		for _, s := range langSubmit {
-			listLang = append(listLang, s.Lang)
+			listLang = append(listLang, strings.Replace(s.Lang, "python3", "python", -1))
 			codePath := path + question.TitleSlug + "." + s.Lang + "." + utils.GetLangSuffix(s.Lang)
 			questionLangInfo = append(questionLangInfo, []string{s.Lang, codePath})
 			if _, err := os.Stat(settings.Setting.Out + codePath); !os.IsNotExist(err) {
